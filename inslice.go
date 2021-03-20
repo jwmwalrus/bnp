@@ -31,9 +31,7 @@ func SliceContains(slic interface{}, val interface{}) bool {
 
 // SliceIndexOf returns the first index found for the given value, or -1
 func SliceIndexOf(slic interface{}, val interface{}) int {
-	exists, index := InSlice(val, slic)
-	if exists {
-		return index
-	}
-	return -1
+	_, index := InSlice(val, slic)
+
+	return index
 }
