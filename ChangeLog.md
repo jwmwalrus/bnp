@@ -6,7 +6,14 @@ All noticeable changes in the project  are documented in this file.
 Format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] 2021-04-17
+
+Added some utilities
+
+### Added
+* Parsing of global/environment arguments
+* Router/logger-related middleware
+
 ## [1.0.0] 2021-04-16
 
 Initial release.
-
