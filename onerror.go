@@ -10,18 +10,23 @@ import (
 
 // LogHTTPError logs and HTTP-related error
 func LogHTTPError(r *http.Response, err error) error {
-	if err != nil {
-		log.WithFields(log.Fields{
-			"statusCode":    r.StatusCode,
-			"statusMessage": r.Status,
-		}).Error(err)
-		return err
-	} else {
-		log.WithFields(log.Fields{
-			"statusCode": r.StatusCode,
-		}).Error(r.Status)
+	if r != nil {
+		if err != nil {
+			log.WithFields(log.Fields{
+				"statusCode": r.StatusCode,
+				"error":      err.Error(),
+			}).Error(r.Status)
+		} else {
+			log.WithFields(log.Fields{
+				"statusCode": r.StatusCode,
+			}).Error(r.Status)
+		}
 		return errors.New(r.Status)
+	} else if err != nil {
+		log.Error(err)
+		return err
 	}
+	return nil
 }
 
 // LogOnError logs an error
