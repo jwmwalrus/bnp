@@ -9,6 +9,14 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.1] 2021-06-26
+
+Quick fix
+
+### Fixed
+
+* HTTP helpers for nil response
+
 ## [1.2.0] 2021-06-26
 
 New Helpers
