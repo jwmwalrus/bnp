@@ -1,30 +1,41 @@
 package bnp
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"runtime"
 
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/errgo.v2/errors"
 )
 
 // LogHTTPError logs and HTTP-related error
-func LogHTTPError(r *http.Response, err error) error {
-	if r != nil {
-		if err != nil {
+func LogHTTPError(err error, r *http.Response, doNotCloseBody bool) error {
+	if err != nil {
+		if r != nil {
 			log.WithFields(log.Fields{
 				"statusCode": r.StatusCode,
-				"error":      err.Error(),
-			}).Error(r.Status)
+				"status":     r.Status,
+			}).Error(err)
 		} else {
-			log.WithFields(log.Fields{
-				"statusCode": r.StatusCode,
-			}).Error(r.Status)
+			log.Error(err)
 		}
-		return errors.New(r.Status)
-	} else if err != nil {
-		log.Error(err)
 		return err
+	} else if r != nil {
+		if !doNotCloseBody {
+			defer r.Body.Close()
+		}
+
+		var b []byte
+		b, _ = ioutil.ReadAll(r.Body)
+		msg := string(b)
+
+		log.WithFields(log.Fields{
+			"statusCode": r.StatusCode,
+			"status":     r.Status,
+			"error":      msg,
+		}).Error(r.Status)
+		return fmt.Errorf("ERROR: %v\n\t%v", r.Status, msg)
 	}
 	return nil
 }
