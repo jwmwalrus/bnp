@@ -9,6 +9,14 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.0] 2021-06-27
+
+Improvements
+
+### Modified
+
+* HTTP status error handler
+
 ## [1.2.2] 2021-06-26
 
 Tag release
