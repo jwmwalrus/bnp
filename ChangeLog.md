@@ -9,6 +9,18 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.1] 2021-07-05
+
+Improvements
+
+### Added
+
+* Integer validators
+
+### Modified
+
+* httpstatus helpers names
+
 ## [1.3.0] 2021-06-27
 
 Improvements
