@@ -21,7 +21,7 @@ func LogHTTPError(err error, r *http.Response, doNotCloseBody bool) error {
 			log.Error(err)
 		}
 		return err
-	} else if r != nil {
+	} else if r != nil && IsHTTPError(r) {
 		if !doNotCloseBody {
 			defer r.Body.Close()
 		}
