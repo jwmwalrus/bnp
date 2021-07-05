@@ -25,9 +25,8 @@ func PathToURL(path string) (s string, err error) {
 // URLExists checks if the string corresponds to an existing location
 // It always returns true if the Scheme is not file
 func URLExists(s string) (exists bool) {
-	var u *url.URL
-	var err error
-	if u, err = url.Parse(s); err != nil {
+	path, u, err := decomposeURL(s)
+	if err != nil {
 		return
 	}
 
@@ -36,10 +35,6 @@ func URLExists(s string) (exists bool) {
 		return
 	}
 
-	var path string
-	if path, err = url.PathUnescape(u.Path); err != nil {
-		return
-	}
 	if _, err = os.Stat(path); !os.IsNotExist(err) {
 		exists = true
 		return
@@ -50,11 +45,30 @@ func URLExists(s string) (exists bool) {
 
 // URLToPath convertes the given URL string to a file path
 func URLToPath(s string) (path string, err error) {
-	var u *url.URL
+	path, _, err = decomposeURL(s)
+	return
+}
+
+func decomposeURL(s string) (path string, u *url.URL, err error) {
 	if u, err = url.Parse(s); err != nil {
 		return
 	}
 
-	path, err = url.PathUnescape(u.Path)
+	if path, err = url.PathUnescape(u.Path); err != nil {
+		return
+	}
+
+	if u.Scheme == "" {
+		u.Scheme = "file"
+	}
+
+	if u.RawQuery != "" {
+		path += "?" + u.RawQuery
+	}
+
+	if u.Fragment != "" {
+		path += "#" + u.Fragment
+	}
+
 	return
 }
