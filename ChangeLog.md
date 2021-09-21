@@ -9,6 +9,15 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.4.0] 2021-09-20
+
+Subpackages
+
+### Modified
+
+* Moved files to its own packages
+* Simplified naming
+
 ## [1.3.1] 2021-07-05
 
 Improvements
