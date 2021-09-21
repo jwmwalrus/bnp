@@ -1,4 +1,4 @@
-package bnp
+package logger
 
 import (
 	"io"
@@ -8,8 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// LoggerToFile Logs to file
-func LoggerToFile() gin.HandlerFunc {
+// ToFile Logs to file
+func ToFile() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Start timer
 		startTime := time.Now()

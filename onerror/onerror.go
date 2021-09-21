@@ -1,4 +1,4 @@
-package bnp
+package onerror
 
 import (
 	"fmt"
@@ -6,11 +6,12 @@ import (
 	"net/http"
 	"runtime"
 
+	"github.com/jwmwalrus/bnp/httpstatus"
 	log "github.com/sirupsen/logrus"
 )
 
-// LogHTTPError logs and HTTP-related error
-func LogHTTPError(err error, r *http.Response, doNotCloseBody bool) error {
+// LogHTTP logs and HTTP-related error
+func LogHTTP(err error, r *http.Response, doNotCloseBody bool) error {
 	if err != nil {
 		if r != nil {
 			log.WithFields(log.Fields{
@@ -21,7 +22,7 @@ func LogHTTPError(err error, r *http.Response, doNotCloseBody bool) error {
 			log.Error(err)
 		}
 		return err
-	} else if r != nil && IsHTTPError(r) {
+	} else if r != nil && httpstatus.IsError(r) {
 		if !doNotCloseBody {
 			defer r.Body.Close()
 		}
@@ -40,8 +41,8 @@ func LogHTTPError(err error, r *http.Response, doNotCloseBody bool) error {
 	return nil
 }
 
-// LogOnError logs an error
-func LogOnError(err error) {
+// Log logs an error
+func Log(err error) {
 	if err != nil {
 		_, file, line, _ := runtime.Caller(1)
 		log.WithFields(log.Fields{
@@ -51,8 +52,8 @@ func LogOnError(err error) {
 	}
 }
 
-// PanicOnError asserts that no error was given
-func PanicOnError(err error) {
+// Panic asserts that no error was given
+func Panic(err error) {
 	if err != nil {
 		_, file, line, _ := runtime.Caller(1)
 		log.WithFields(log.Fields{
@@ -66,8 +67,8 @@ func PanicOnError(err error) {
 	}
 }
 
-// WarnOnError warns on error
-func WarnOnError(err error) {
+// Warn warns on error
+func Warn(err error) {
 	if err != nil {
 		_, file, line, _ := runtime.Caller(1)
 		log.WithFields(log.Fields{

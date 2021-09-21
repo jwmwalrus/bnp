@@ -1,4 +1,4 @@
-package bnp
+package urlstr
 
 import (
 	"net/url"
@@ -37,7 +37,6 @@ func URLExists(s string) (exists bool) {
 
 	if _, err = os.Stat(path); !os.IsNotExist(err) {
 		exists = true
-		return
 	}
 
 	return
