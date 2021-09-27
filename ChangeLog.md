@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.5.0] 2021-09-26
+
+Remove obsolete args in env.SetDirs
+
 ## [1.4.0] 2021-09-20
 
 Subpackages
