@@ -27,7 +27,7 @@ func ParseArgs(logFile *lumberjack.Logger, echoLogging, verbose *bool, severity 
 }
 
 // SetDirs Ensure that environment directories exist
-func SetDirs(configFile, lockFile, cacheDir, configDir, dataDir, runtimeDir string) (err error) {
+func SetDirs(cacheDir, configDir, dataDir, runtimeDir string) (err error) {
 
 	if _, err = os.Stat(cacheDir); os.IsNotExist(err) {
 		err = os.MkdirAll(cacheDir, 0755)
