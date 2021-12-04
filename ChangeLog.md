@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.6.0] 2021-12-03
+
+Update Go version and bumpy-ride
+
 ## [1.5.0] 2021-09-26
 
 Remove obsolete args in env.SetDirs
