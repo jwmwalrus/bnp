@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.7.0] 2021-12-11
+
+Remove env.ParseArgs
+
 ## [1.6.0] 2021-12-03
 
 Update Go version and bumpy-ride
