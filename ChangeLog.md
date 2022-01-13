@@ -9,6 +9,18 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.8.0] 2022-01-12
+
+Added and removed
+
+### Added
+
+* Common string utilities
+
+### Removed
+
+* Moved logger and onerror to their own repos
+
 ## [1.7.0] 2021-12-11
 
 Remove env.ParseArgs
