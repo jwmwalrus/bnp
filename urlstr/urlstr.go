@@ -9,8 +9,15 @@ import (
 
 // PathToURL converts a path to a URL string
 func PathToURL(path string) (s string, err error) {
+	var realpath string
+	if realpath, err = filepath.EvalSymlinks(path); err != nil {
+		return
+	}
+
+	realpath = filepath.Clean(strings.ReplaceAll(realpath, "%", "%25"))
+
 	var u *url.URL
-	if u, err = url.Parse(filepath.Clean(strings.ReplaceAll(path, "%", "%25"))); err != nil {
+	if u, err = url.Parse(realpath); err != nil {
 		return
 	}
 
