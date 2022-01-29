@@ -10,11 +10,16 @@ import (
 // PathToURL converts a path to a URL string
 func PathToURL(path string) (s string, err error) {
 	var realpath string
-	if realpath, err = filepath.EvalSymlinks(path); err != nil {
+
+	realpath, err = filepath.EvalSymlinks(path)
+	if err != nil {
 		return
 	}
 
-	realpath = filepath.Clean(strings.ReplaceAll(realpath, "%", "%25"))
+	realpath, err = filepath.Abs(strings.ReplaceAll(realpath, "%", "%25"))
+	if err != nil {
+		return
+	}
 
 	var u *url.URL
 	if u, err = url.Parse(realpath); err != nil {
