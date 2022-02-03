@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.9.0] 2022-02-03
+
+Add PathToURLUnchecked
+
 ## [1.8.2] 2022-01-15
 
 Make path to URL absolute (reprise)
