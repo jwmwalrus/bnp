@@ -8,15 +8,18 @@ import (
 )
 
 // PathToURL converts a path to a URL string
-func PathToURL(path string) (s string, err error) {
-	var realpath string
-
-	realpath, err = filepath.EvalSymlinks(path)
+func PathToURL(path string) (string, error) {
+	realpath, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return
+		return "", err
 	}
 
-	realpath, err = filepath.Abs(strings.ReplaceAll(realpath, "%", "%25"))
+	return PathToURLUnchecked(realpath)
+}
+
+// PathToURLUnchecked converts a path to a URL string
+func PathToURLUnchecked(path string) (s string, err error) {
+	realpath, err := filepath.Abs(strings.ReplaceAll(path, "%", "%25"))
 	if err != nil {
 		return
 	}
