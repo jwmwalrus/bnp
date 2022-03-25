@@ -9,6 +9,20 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.10.0] 2022-03-24
+
+Misc. changes
+
+### Modified
+
+* Renamed package: stringing -> ing2
+* Updated go version
+
+### Removed
+
+* Deleted the slice package
+    * Superseeded by `golang.org/x/exp/slice`
+
 ## [1.9.0] 2022-02-03
 
 Add PathToURLUnchecked
