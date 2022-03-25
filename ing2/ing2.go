@@ -1,4 +1,4 @@
-package stringing
+package ing2
 
 import (
 	"math/rand"
