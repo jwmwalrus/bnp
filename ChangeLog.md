@@ -9,6 +9,18 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.11.0] 2022-08-26
+
+Enhancements
+
+### Added
+* ing2.GetRandomLetters
+    * Reimplements `ing2.GetRandomString`, using `crypto/rand`
+
+### Modified
+* Upgrade Go version
+* Use an atomic pointer for `ing2.randomseed`
+
 ## [1.10.0] 2022-03-24
 
 Misc. changes
