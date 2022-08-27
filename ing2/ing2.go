@@ -1,11 +1,12 @@
 package ing2
 
 import (
-	"math/rand"
+	mrand "math/rand"
+	"sync/atomic"
 	"time"
 )
 
-var randomSeed *rand.Rand
+var randomSeed atomic.Pointer[mrand.Rand]
 
 // GetRandomString returns a random string of the given length
 func GetRandomString(n int) string {
@@ -13,7 +14,7 @@ func GetRandomString(n int) string {
 
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = charset[randomSeed.Intn(len(charset))]
+		b[i] = charset[randomSeed.Load().Intn(len(charset))]
 	}
 	return string(b)
 }
