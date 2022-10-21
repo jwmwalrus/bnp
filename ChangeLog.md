@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.12.0] 2022-10-21
+
+Add the pointers package
+
 ## [1.11.0] 2022-08-26
 
 Enhancements
