@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.13.0] 2023-03-31
+
+Add the CreatetheseDirs function
+
 ## [1.12.0] 2022-10-21
 
 Add the pointers package
