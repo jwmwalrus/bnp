@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.14.0] 2023-05-13
+
+Add FindExec and FindLibExec
+
 ## [1.13.0] 2023-03-31
 
 Add the CreatetheseDirs function
