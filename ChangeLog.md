@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.14.1] 2023-08-13
+
+Upgrade Go version
+
 ## [1.14.0] 2023-05-13
 
 Add FindExec and FindLibExec
