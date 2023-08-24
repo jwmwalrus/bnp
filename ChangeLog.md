@@ -9,6 +9,20 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.16.0] 2023-08-24
+
+Additions from other packages
+
+### Added
+
+* onerror package from onerror
+* cron package from retrace
+* rsynccb package from retrace
+
+### Modified
+
+* Updated README
+
 ## [1.15.0] 2023-08-23
 
 Add the git package from bumpy-ride
