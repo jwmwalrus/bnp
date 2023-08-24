@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.15.0] 2023-08-23
+
+Add the git package from bumpy-ride
+
 ## [1.14.1] 2023-08-13
 
 Upgrade Go version
