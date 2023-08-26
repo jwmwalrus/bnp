@@ -9,6 +9,15 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.16.1] 2023-08-26
+
+Rework onerror implementation
+
+### Fixed
+
+* `onerror.Wit()` mismatch in relation to `slog.With()`
+* missing `Fatal()` signature in `onerror.Recorder` interface
+
 ## [1.16.0] 2023-08-24
 
 Additions from other packages
