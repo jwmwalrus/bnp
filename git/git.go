@@ -15,27 +15,43 @@ import (
 // RestoreCwdFunc defines the signature of the closure to restore the working directory
 type RestoreCwdFunc func() error
 
+// Interface provides a handler to git's command line
 type Interface interface {
+	// AddToStaging adds the given files to staging
+	AddToStaging(files []string) (err error)
+
 	// CreateTag creates an annotated tag
 	CreateTag(tag, msg string) (err error)
 
+	// Commit commits files in staging with the given message
+	Commit(msg string) (err error)
+
 	// CommitFiles adds the given files to staging and commits them with the given message
-	CommitFiles(sList []string, msg string) (err error)
+	CommitFiles(files []string, msg string) (err error)
 
 	// Describe returns the corresponding tag for the given hash
-	Describe(hash string, exact ...bool) (string, error)
+	Describe(hash string, exact ...bool) (tag string, err error)
+
+	// Fetch brings the latest changes for the given remote
+	Fetch(remote string) (err error)
 
 	// FileChanged checks if a file changed and should be added to staging
 	FileChanged(file string) bool
 
-	// GetLatestTag Returns the latest tag for the git repo related to the working directory
-	GetLatestTag(noFetch bool) (tag string, err error)
+	// Init git-initializes the root directory
+	Init() error
+
+	// LatestTag Returns the latest tag for the git repo related to the working directory
+	LatestTag(noFetch bool) (tag string, err error)
 
 	// MoveToRootDir changes working directory to git's root
 	MoveToRootDir() RestoreCwdFunc
 
 	// RemoveFromStaging removes the given files from the stagin area
-	RemoveFromStaging(sList []string, ignoreErrors bool) (err error)
+	RemoveFromStaging(files []string, ignoreErrors bool) (err error)
+
+	// Status reports the current status of the working tree
+	Status() (staged, unstaged, untracked []string, err error)
 }
 
 func NewInterface(dir string) (Interface, error) {
@@ -45,7 +61,8 @@ func NewInterface(dir string) (Interface, error) {
 
 	rootDir, err := getRootDir(dir)
 	if err != nil {
-		return nil, err
+		// NOTE: not a git directory (yet)
+		err = nil
 	}
 
 	return &handler{root: rootDir}, nil
@@ -55,6 +72,29 @@ type handler struct {
 	root string
 }
 
+// AddToStaging adds the given files to staging
+func (h *handler) AddToStaging(files []string) (err error) {
+	for i := range files {
+		files[i], err = filepath.Abs(files[i])
+		if err != nil {
+			return
+		}
+	}
+
+	restore := h.MoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\tStaging files...\n")
+	for _, s := range files {
+		if err = executeNO("add", s); err != nil {
+			_ = h.RemoveFromStaging(files, true)
+			return
+		}
+	}
+
+	return
+}
+
 // CreateTag creates an annotated tag
 func (h *handler) CreateTag(tag, msg string) (err error) {
 	restore := h.MoveToRootDir()
@@ -62,14 +102,22 @@ func (h *handler) CreateTag(tag, msg string) (err error) {
 
 	fmt.Printf("\nCreating annotated tag %v with message '%v'...\n", tag, msg)
 
-	_, err = exec.Command("git", "tag", "-a", tag, "-m", msg).CombinedOutput()
-	return
+	return executeNO("tag", "--annotate", tag, "-m", msg)
+}
+
+// Commit commits files in staging with the given message
+func (h *handler) Commit(msg string) (err error) {
+	restore := h.MoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\tCommiting with '%v' as message...\n", msg)
+	return executeNO("commit", "--message", msg)
 }
 
 // CommitFiles adds the given files to staging and commits them with the given message
-func (h *handler) CommitFiles(sList []string, msg string) (err error) {
-	for i := range sList {
-		sList[i], err = filepath.Abs(sList[i])
+func (h *handler) CommitFiles(files []string, msg string) (err error) {
+	for i := range files {
+		files[i], err = filepath.Abs(files[i])
 		if err != nil {
 			return
 		}
@@ -80,16 +128,13 @@ func (h *handler) CommitFiles(sList []string, msg string) (err error) {
 
 	fmt.Printf("\nCommiting files...\n")
 
-	fmt.Printf("\tStaging files...\n")
-	for _, s := range sList {
-		if _, err = exec.Command("git", "add", s).CombinedOutput(); err != nil {
-			_ = h.RemoveFromStaging(sList, true)
-			return
-		}
+	if err = h.AddToStaging(files); err != nil {
+		_ = h.RemoveFromStaging(files, true)
+		return
 	}
-	fmt.Printf("\tCommiting with '%v' as message...\n", msg)
-	if _, err = exec.Command("git", "commit", "-m", msg).CombinedOutput(); err != nil {
-		_ = h.RemoveFromStaging(sList, true)
+
+	if err = h.Commit(msg); err != nil {
+		_ = h.RemoveFromStaging(files, true)
 		return
 	}
 
@@ -101,20 +146,31 @@ func (h *handler) Describe(hash string, exact ...bool) (string, error) {
 	restore := h.MoveToRootDir()
 	defer restore()
 
-	list := []string{"describe"}
+	args := []string{"describe"}
 	if len(exact) > 0 && exact[0] {
-		list = append(list, "--match-exact")
+		args = append(args, "--match-exact")
 	}
-	list = append(list, hash)
-	cmd1 := exec.Command("git", list...)
-	output1 := &bytes.Buffer{}
-	cmd1.Stdout = output1
-	if err := cmd1.Run(); err != nil {
+	args = append(args, hash)
+
+	out, err := execute(args...)
+	if err != nil {
 		return "", err
 	}
-	tag := string(output1.Bytes())
+
+	tag := string(out)
 	tag = strings.TrimSuffix(tag, "\n")
 	return tag, nil
+}
+
+// Fetch brings the latest changes for the given remote
+func (h *handler) Fetch(remote string) (err error) {
+	fmt.Printf("\tFetching...\n")
+
+	if remote != "" {
+		return executeNO("fetch", remote, "--tags")
+	}
+
+	return executeNO("fetch", "--tags")
 }
 
 // FileChanged checks if a file changed and should be added to staging
@@ -131,19 +187,29 @@ func (h *handler) FileChanged(file string) bool {
 	restore := h.MoveToRootDir()
 	defer restore()
 
-	cmd1 := exec.Command("git", "diff", "--name-only", file)
-	output1 := &bytes.Buffer{}
-	cmd1.Stdout = output1
-	if err := cmd1.Run(); err != nil {
+	out, err := execute("diff", "--name-only", file)
+	if err != nil {
 		return false
 	}
-	diff := string(output1.Bytes())
+	diff := string(out)
 	diff = strings.TrimSuffix(diff, "\n")
 	return len(diff) > 0
 }
 
-// GetLatestTag Returns the latest tag for the git repo related to the working directory
-func (h *handler) GetLatestTag(noFetch bool) (tag string, err error) {
+// Init git-initializes the root directory
+func (h *handler) Init() error {
+	restore := h.MoveToRootDir()
+	defer restore()
+
+	if _, _, _, err := h.Status(); err == nil {
+		return nil
+	}
+
+	return executeNO("init")
+}
+
+// LatestTag Returns the latest tag for the git repo related to the working directory
+func (h *handler) LatestTag(noFetch bool) (tag string, err error) {
 	restore := h.MoveToRootDir()
 	defer restore()
 
@@ -151,28 +217,25 @@ func (h *handler) GetLatestTag(noFetch bool) (tag string, err error) {
 
 	if !noFetch {
 		fmt.Printf("\tFetching...\n")
-		if _, err = exec.Command("git", "fetch", "--tags").CombinedOutput(); err != nil {
+		if err = h.Fetch(""); err != nil {
 			fmt.Printf("...fetching failed!\n")
 		}
 	}
 
-	cmd1 := exec.Command("git", "rev-list", "--tags", "--max-count=1")
-	output1 := &bytes.Buffer{}
-	cmd1.Stdout = output1
-	if err = cmd1.Run(); err != nil {
+	out1, err := execute("rev-list", "--tags", "--max-count=1")
+	if err != nil {
 		return
 	}
-	hash := string(output1.Bytes())
+
+	hash := string(out1)
 	hash = strings.TrimSuffix(hash, "\n")
 
-	cmd2 := exec.Command("git", "describe", "--tags", hash)
-	output2 := &bytes.Buffer{}
-	cmd2.Stdout = output2
-	if err = cmd2.Run(); err != nil {
+	out2, err := execute("describe", "--tags", hash)
+	if err != nil {
 		return
 	}
 
-	tag = string(output2.Bytes())
+	tag = string(out2)
 	tag = strings.TrimSuffix(tag, "\n")
 
 	return
@@ -195,9 +258,9 @@ func (h *handler) MoveToRootDir() RestoreCwdFunc {
 }
 
 // RemoveFromStaging removes the given files from the stagin area
-func (h *handler) RemoveFromStaging(sList []string, ignoreErrors bool) (err error) {
-	for i := range sList {
-		sList[i], err = filepath.Abs(sList[i])
+func (h *handler) RemoveFromStaging(files []string, ignoreErrors bool) (err error) {
+	for i := range files {
+		files[i], err = filepath.Abs(files[i])
 		if err != nil {
 			return
 		}
@@ -206,12 +269,58 @@ func (h *handler) RemoveFromStaging(sList []string, ignoreErrors bool) (err erro
 	restore := h.MoveToRootDir()
 	defer restore()
 
-	for _, s := range sList {
-		if _, err = exec.Command("git", "reset", s).CombinedOutput(); err != nil {
+	for _, s := range files {
+		if err = executeNO("reset", s); err != nil {
 			if !ignoreErrors {
 				return
 			}
 		}
+	}
+	return
+}
+
+// Status reports the current status of the working tree
+func (h *handler) Status() (staged, unstaged, untracked []string, err error) {
+	out, err := execute("status", "--short", "--porcelain")
+	if err != nil {
+		return
+	}
+
+	all := strings.Split(string(out), "\n")
+
+	for _, line := range all {
+		if len(line) < 3 {
+			continue
+		}
+
+		state := line[:2]
+		file := line[3:]
+
+		switch state[0] {
+		case '?', '!':
+			before, _, _ := strings.Cut(file, "->")
+			untracked = append(untracked, before)
+		case ' ':
+			switch state[1] {
+			case 'A', 'C', 'D', 'M', 'R', 'T', 'U':
+				before, _, _ := strings.Cut(file, "->")
+				unstaged = append(unstaged, before)
+			default:
+			}
+		case 'A', 'C', 'D', 'M', 'R', 'T', 'U':
+			before, _, _ := strings.Cut(file, "->")
+			staged = append(staged, before)
+		default:
+		}
+	}
+
+	return
+}
+
+func (h *handler) TopLevel(dir string) (rootDir string, err error) {
+	rootDir, err = getRootDir(dir)
+	if err != nil {
+		rootDir = ""
 	}
 	return
 }
@@ -228,23 +337,35 @@ func getRootDir(dir string) (rootDir string, err error) {
 		return
 	}
 
-	err = os.Chdir(dir)
+	if pwd != dir {
+		err = os.Chdir(dir)
+		if err != nil {
+			return
+		}
+
+		defer func() { os.Chdir(pwd) }()
+	}
+
+	out, err := execute("rev-parse", "--show-toplevel")
 	if err != nil {
+		rootDir = dir
 		return
 	}
 
-	defer func() { os.Chdir(pwd) }()
-
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	output := &bytes.Buffer{}
-	cmd.Stdout = output
-	err = cmd.Run()
-	if err != nil {
-		return
-	}
-
-	rootDir = string(output.Bytes())
+	rootDir = string(out)
 	rootDir = strings.TrimSuffix(rootDir, "\n")
-
 	return
+}
+
+func executeNO(args ...string) error {
+	_, err := exec.Command("git", args...).CombinedOutput()
+	return err
+}
+
+func execute(args ...string) ([]byte, error) {
+	cmd := exec.Command("git", args...)
+	out := &bytes.Buffer{}
+	cmd.Stdout = out
+	err := cmd.Run()
+	return out.Bytes(), err
 }
