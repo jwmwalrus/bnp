@@ -2,22 +2,64 @@ package git
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+
+	"github.com/jwmwalrus/bnp/onerror"
 )
 
 // RestoreCwdFunc defines the signature of the closure to restore the working directory
 type RestoreCwdFunc func() error
 
-// CreateTag creates an annotated tag
-func CreateTag(tag, msg string) (err error) {
+type Interface interface {
+	// CreateTag creates an annotated tag
+	CreateTag(tag, msg string) (err error)
+
+	// CommitFiles adds the given files to staging and commits them with the given message
+	CommitFiles(sList []string, msg string) (err error)
+
+	// Describe returns the corresponding tag for the given hash
+	Describe(hash string, exact ...bool) (string, error)
+
+	// FileChanged checks if a file changed and should be added to staging
+	FileChanged(file string) bool
+
+	// GetLatestTag Returns the latest tag for the git repo related to the working directory
+	GetLatestTag(noFetch bool) (tag string, err error)
+
+	// MoveToRootDir changes working directory to git's root
+	MoveToRootDir() RestoreCwdFunc
+
+	// RemoveFromStaging removes the given files from the stagin area
+	RemoveFromStaging(sList []string, ignoreErrors bool) (err error)
+}
+
+func NewInterface(dir string) (Interface, error) {
 	if !HasGit() {
-		err = errors.New("Unable to find the git command")
-		return
+		return nil, fmt.Errorf("Unable to find the git command")
 	}
+
+	rootDir, err := getRootDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	return &handler{root: rootDir}, nil
+}
+
+type handler struct {
+	root string
+}
+
+// CreateTag creates an annotated tag
+func (h *handler) CreateTag(tag, msg string) (err error) {
+	restore := h.MoveToRootDir()
+	defer restore()
+
 	fmt.Printf("\nCreating annotated tag %v with message '%v'...\n", tag, msg)
 
 	_, err = exec.Command("git", "tag", "-a", tag, "-m", msg).CombinedOutput()
@@ -25,23 +67,29 @@ func CreateTag(tag, msg string) (err error) {
 }
 
 // CommitFiles adds the given files to staging and commits them with the given message
-func CommitFiles(sList []string, m string) (err error) {
-	if !HasGit() {
-		err = errors.New("Unable to find the git command")
-		return
+func (h *handler) CommitFiles(sList []string, msg string) (err error) {
+	for i := range sList {
+		sList[i], err = filepath.Abs(sList[i])
+		if err != nil {
+			return
+		}
 	}
+
+	restore := h.MoveToRootDir()
+	defer restore()
+
 	fmt.Printf("\nCommiting files...\n")
 
 	fmt.Printf("\tStaging files...\n")
 	for _, s := range sList {
 		if _, err = exec.Command("git", "add", s).CombinedOutput(); err != nil {
-			_ = RemoveFromStaging(sList, true)
+			_ = h.RemoveFromStaging(sList, true)
 			return
 		}
 	}
-	fmt.Printf("\tCommiting with '%v' as message...\n", m)
-	if _, err = exec.Command("git", "commit", "-m", m).CombinedOutput(); err != nil {
-		_ = RemoveFromStaging(sList, true)
+	fmt.Printf("\tCommiting with '%v' as message...\n", msg)
+	if _, err = exec.Command("git", "commit", "-m", msg).CombinedOutput(); err != nil {
+		_ = h.RemoveFromStaging(sList, true)
 		return
 	}
 
@@ -49,7 +97,10 @@ func CommitFiles(sList []string, m string) (err error) {
 }
 
 // Describe returns the corresponding tag for the given hash
-func Describe(hash string, exact ...bool) (string, error) {
+func (h *handler) Describe(hash string, exact ...bool) (string, error) {
+	restore := h.MoveToRootDir()
+	defer restore()
+
 	list := []string{"describe"}
 	if len(exact) > 0 && exact[0] {
 		list = append(list, "--match-exact")
@@ -67,7 +118,19 @@ func Describe(hash string, exact ...bool) (string, error) {
 }
 
 // FileChanged checks if a file changed and should be added to staging
-func FileChanged(file string) bool {
+func (h *handler) FileChanged(file string) bool {
+	file, err := filepath.Abs(file)
+	if err != nil {
+		slog.With(
+			"file", file,
+			"error", err,
+		).Error("Failed to get file's absolute path")
+		return false
+	}
+
+	restore := h.MoveToRootDir()
+	defer restore()
+
 	cmd1 := exec.Command("git", "diff", "--name-only", file)
 	output1 := &bytes.Buffer{}
 	cmd1.Stdout = output1
@@ -80,11 +143,10 @@ func FileChanged(file string) bool {
 }
 
 // GetLatestTag Returns the latest tag for the git repo related to the working directory
-func GetLatestTag(noFetch bool) (tag string, err error) {
-	if !HasGit() {
-		err = errors.New("Unable to find the git command")
-		return
-	}
+func (h *handler) GetLatestTag(noFetch bool) (tag string, err error) {
+	restore := h.MoveToRootDir()
+	defer restore()
+
 	fmt.Printf("\nGetting latest git tag...\n")
 
 	if !noFetch {
@@ -116,46 +178,33 @@ func GetLatestTag(noFetch bool) (tag string, err error) {
 	return
 }
 
-// HasGit checks if the git command exists in PATH
-func HasGit() bool {
-	s, err := exec.LookPath("git")
-	return s != "" && err == nil
-}
-
 // MoveToRootDir changes working directory to git's root
-func MoveToRootDir() (RestoreCwdFunc, error) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	root := pwd
+func (h *handler) MoveToRootDir() RestoreCwdFunc {
+	cwd, err := os.Getwd()
+	onerror.Fatal(err)
+	root := cwd
 
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	output := &bytes.Buffer{}
-	cmd.Stdout = output
-	if err = cmd.Run(); err != nil {
-		return nil, err
+	if root == h.root {
+		return func() error { return nil }
 	}
 
-	root = string(output.Bytes())
-	root = strings.TrimSuffix(root, "\n")
-	if root == pwd {
-		return func() error { return nil }, nil
-	}
+	root = h.root
+	onerror.Fatal(os.Chdir(root))
 
-	if err = os.Chdir(root); err != nil {
-		return nil, err
-	}
-
-	return func() error { return os.Chdir(pwd) }, nil
+	return func() error { return os.Chdir(cwd) }
 }
 
 // RemoveFromStaging removes the given files from the stagin area
-func RemoveFromStaging(sList []string, ignoreErrors bool) (err error) {
-	if !HasGit() {
-		err = errors.New("Unable to find the git command")
-		return
+func (h *handler) RemoveFromStaging(sList []string, ignoreErrors bool) (err error) {
+	for i := range sList {
+		sList[i], err = filepath.Abs(sList[i])
+		if err != nil {
+			return
+		}
 	}
+
+	restore := h.MoveToRootDir()
+	defer restore()
 
 	for _, s := range sList {
 		if _, err = exec.Command("git", "reset", s).CombinedOutput(); err != nil {
@@ -164,5 +213,38 @@ func RemoveFromStaging(sList []string, ignoreErrors bool) (err error) {
 			}
 		}
 	}
+	return
+}
+
+// HasGit checks if the git command exists in PATH
+func HasGit() bool {
+	s, err := exec.LookPath("git")
+	return s != "" && err == nil
+}
+
+func getRootDir(dir string) (rootDir string, err error) {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	err = os.Chdir(dir)
+	if err != nil {
+		return
+	}
+
+	defer func() { os.Chdir(pwd) }()
+
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	output := &bytes.Buffer{}
+	cmd.Stdout = output
+	err = cmd.Run()
+	if err != nil {
+		return
+	}
+
+	rootDir = string(output.Bytes())
+	rootDir = strings.TrimSuffix(rootDir, "\n")
+
 	return
 }
