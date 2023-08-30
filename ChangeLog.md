@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.16.2] 2023-08-29
+
+Remove redundant caller attributes
+
 ## [1.16.1] 2023-08-26
 
 Rework onerror implementation
