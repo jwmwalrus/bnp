@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -133,7 +134,7 @@ func (h *handlerImpl) AddToStaging(files []string) (err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nStaging files...\n")
+	slog.Info("Staging files", "files", files)
 
 	for _, s := range files {
 		if err = executeNO("add", s); err != nil {
@@ -150,7 +151,7 @@ func (h *handlerImpl) Branch() (name string, err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nReturning active branch...\n")
+	slog.Info("Returning active branch")
 
 	out, err := execute("branch", "--show-current")
 	if err != nil {
@@ -166,7 +167,7 @@ func (h *handlerImpl) Branches(all ...bool) (list []string, err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nReturning list of branches...\n")
+	slog.Info("Returning list of branches", "all", all)
 
 	args := []string{"branch", "--no-color"}
 	if len(all) > 0 && all[0] {
@@ -192,7 +193,7 @@ func (h *handlerImpl) CheckoutBranch(name string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nChecing out %s branch...\n", name)
+	slog.Info("Checing out branch", "name", name)
 
 	return executeNO("checkout", name)
 }
@@ -202,7 +203,7 @@ func (h *handlerImpl) CheckoutNewBranch(name string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nChecking out new branch...\n")
+	slog.Info("Checking out new branch", "name", name)
 
 	err := h.NewBranch(name)
 	if err != nil {
@@ -223,7 +224,7 @@ func (h *handlerImpl) Commit(msg string) (err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nCommiting with '%v' as message...\n", msg)
+	slog.Info("Commiting", "msg", msg)
 
 	return executeNO("commit", "--message", msg)
 }
@@ -235,7 +236,10 @@ func (h *handlerImpl) CommitFiles(files []string, msg string) (err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nCommiting files...\n")
+	slog.With(
+		"files", files,
+		"msg", msg,
+	).Info("Commiting with files")
 
 	if err = h.AddToStaging(files); err != nil {
 		_ = h.RemoveFromStaging(files, true)
@@ -255,7 +259,7 @@ func (h *handlerImpl) Config(key string) (value string, err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nSetting %s to %s...\n", key, value)
+	slog.Info("Getting config value", "key", key)
 
 	out, err := execute("config", key)
 	if err != nil {
@@ -271,7 +275,10 @@ func (h *handlerImpl) DeleteBranch(name string, force ...bool) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nDeleting %s branch...\n", name)
+	slog.With(
+		"name", name,
+		"force", force,
+	).Info("Deleting branch")
 
 	args := []string{"branch", "--delete"}
 	if len(force) > 0 && force[0] {
@@ -286,11 +293,11 @@ func (h *handlerImpl) DeleteBranch(name string, force ...bool) error {
 func (h *handlerImpl) DropStash(clear ...bool) error {
 	args := []string{"stash"}
 
+	slog.Info("Dropping from stash", "clear", clear)
+
 	if len(clear) > 0 && clear[0] {
-		fmt.Printf("\nClearing stash...\n")
 		args = append(args, "clear")
 	} else {
-		fmt.Printf("\nDropping from stash...\n")
 		args = append(args, "drop")
 	}
 	return executeNO(args...)
@@ -301,7 +308,10 @@ func (h *handlerImpl) Describe(hash string, exact ...bool) (string, error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nDescribing current tree state...\n")
+	slog.With(
+		"hash", hash,
+		"exact", exact,
+	).Info("Describing current tree state")
 
 	args := []string{"describe"}
 	if len(exact) > 0 && exact[0] {
@@ -323,7 +333,7 @@ func (h *handlerImpl) Describe(hash string, exact ...bool) (string, error) {
 
 // Fetch implements the Handler interface
 func (h *handlerImpl) Fetch(remote string) (err error) {
-	fmt.Printf("\nFetching...\n")
+	slog.Info("Fetching", "remote", remote)
 
 	if remote != "" {
 		return executeNO("fetch", remote, "--tags")
@@ -340,7 +350,7 @@ func (h *handlerImpl) FileChanged(file string) bool {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nChecking if file changed...\n")
+	slog.Info("Checking if file changed", "file", file)
 
 	out, err := execute("diff", "--name-only", file)
 	if err != nil {
@@ -356,7 +366,7 @@ func (h *handlerImpl) Init(initialBranch string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nInitializing as git repository...\n")
+	slog.Info("Initializing git repository", "initial-branch", initialBranch)
 
 	if _, _, _, err := h.Status(); err == nil {
 		return nil
@@ -374,7 +384,7 @@ func (h *handlerImpl) LatestHash(noFetch ...bool) (hash string, err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nGetting latest hash...\n")
+	slog.Info("Getting latest hash", "no-fetch", noFetch)
 
 	doFetch := true
 	if len(noFetch) > 0 && noFetch[0] {
@@ -403,7 +413,7 @@ func (h *handlerImpl) LatestTag(noFetch ...bool) (tag string, err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nGetting latest git tag...\n")
+	slog.Info("Getting latest tag", "no-fetch", noFetch)
 
 	doFetch := true
 	if len(noFetch) > 0 && noFetch[0] {
@@ -440,7 +450,11 @@ func (h *handlerImpl) MergeStash(remote, branch, commitMsg string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nPerforming Stash + Pull + Merge Stash...\n")
+	slog.With(
+		"remote", remote,
+		"branch", branch,
+		"commit-msg", commitMsg,
+	).Info("Performing Stash + Pull + Merge Stash")
 
 	_, err := h.Stash("", true)
 	if err != nil {
@@ -481,7 +495,7 @@ func (h *handlerImpl) NewBranch(name string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nCreating branch...\n")
+	slog.Info("Creating branch", "name", name)
 
 	return executeNO("branch", name)
 }
@@ -491,7 +505,10 @@ func (h *handlerImpl) NewTag(tag, msg string) (err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nCreating annotated tag %v with message '%v'...\n", tag, msg)
+	slog.With(
+		"tag", tag,
+		"msg", msg,
+	).Info("Creating annotated tag")
 
 	return executeNO("tag", "--annotate", tag, "-m", msg)
 }
@@ -501,7 +518,10 @@ func (h *handlerImpl) Pull(remote, branch string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nPulling %s changes from %s...\n", branch, remote)
+	slog.With(
+		"remote", remote,
+		"branch", branch,
+	).Info("Pulling changes from remote branch")
 
 	return executeNO("pull", remote, branch)
 }
@@ -511,7 +531,10 @@ func (h *handlerImpl) Push(remote, branch string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nPushing %s changes to %s...\n", branch, remote)
+	slog.With(
+		"remote", remote,
+		"branch", branch,
+	).Info("Pushing changes to remote branch")
 
 	return executeNO("push", remote, branch)
 }
@@ -521,7 +544,7 @@ func (h *handlerImpl) Remotes() (list map[string]string, err error) {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nGetting list of remotes...\n")
+	slog.Info("Getting list of remotes")
 
 	out, err := execute("remote")
 	if err != nil {
@@ -553,6 +576,11 @@ func (h *handlerImpl) RemoveFromStaging(files []string, ignoreErrors ...bool) (e
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
+	slog.With(
+		"files", files,
+		"ignore-errors", ignoreErrors,
+	).Info("Removing file(s) from staging")
+
 	ackErrors := true
 	if len(ignoreErrors) > 0 && ignoreErrors[0] {
 		ackErrors = false
@@ -573,7 +601,10 @@ func (h *handlerImpl) SetConfig(key string, value string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nSetting %s to %s...\n", key, value)
+	slog.With(
+		"key", key,
+		"value", value,
+	).Info("Setting config value")
 
 	return executeNO("config", key, value)
 }
@@ -583,7 +614,10 @@ func (h *handlerImpl) SetRemote(name string, url string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nSetting remote...\n")
+	slog.With(
+		"name", name,
+		"url", url,
+	).Info("Setting remote")
 
 	list, err := h.Remotes()
 	if err != nil {
@@ -604,7 +638,10 @@ func (h *handlerImpl) SetUpstreamBranchTo(remote, branch string) error {
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nSetting %s branch's remote to %s...\n", branch, remote)
+	slog.With(
+		"remote", remote,
+		"branch", branch,
+	).Info("Setting active branch to track upsteam's")
 
 	return executeNO("branch", "--set-upstream-to", remote+"/"+branch)
 }
@@ -614,7 +651,10 @@ func (h *handlerImpl) Stash(msg string, untracked ...bool) (stash string, err er
 	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nStashing changes...\n")
+	slog.With(
+		"msg", msg,
+		"untracked", untracked,
+	).Info("Stashing changes")
 
 	args := []string{"stash"}
 
@@ -650,6 +690,8 @@ func (h *handlerImpl) Stash(msg string, untracked ...bool) (stash string, err er
 
 // Status implements the Handler interface
 func (h *handlerImpl) Status() (staged, unstaged, untracked []string, err error) {
+	slog.Info("Getting status")
+
 	out, err := execute("status", "--short", "--porcelain")
 	if err != nil {
 		return
@@ -688,6 +730,8 @@ func (h *handlerImpl) Status() (staged, unstaged, untracked []string, err error)
 
 // TopLevel implements the Handler interface
 func (h *handlerImpl) TopLevel(dir string) (rootDir string, err error) {
+	slog.Info("Getting top level", "dir", dir)
+
 	rootDir, err = getRootDir(dir)
 	if err != nil {
 		rootDir = ""
@@ -698,6 +742,11 @@ func (h *handlerImpl) TopLevel(dir string) (rootDir string, err error) {
 func (h *handlerImpl) makeAbsPath(files []string) []string {
 	pwd, err := os.Getwd()
 	if err != nil || (pwd != h.root && !strings.Contains(pwd, h.root)) {
+		slog.With(
+			"pwd", pwd,
+			"root", h.root,
+			"error", err,
+		).Error("Failed check for absolute path")
 		return files
 	}
 
@@ -747,6 +796,7 @@ func getRootDir(dir string) (rootDir string, err error) {
 
 func executeNO(args ...string) error {
 	cmd := exec.Command("git", args...)
+	slog.Debug("Running command with combined output", "cmd", cmd)
 	_, err := cmd.CombinedOutput()
 	return err
 }
@@ -755,6 +805,7 @@ func execute(args ...string) ([]byte, error) {
 	cmd := exec.Command("git", args...)
 	out := &bytes.Buffer{}
 	cmd.Stdout = out
+	slog.Debug("Running command", "cmd", cmd)
 	err := cmd.Run()
 	return out.Bytes(), err
 }
