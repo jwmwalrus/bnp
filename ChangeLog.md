@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.19.1] 2023-09-02
+
+Use slo for git instead of stdout
+
 ## [1.19.0] 2023-09-01
 
 Complete the git.Handler interface
