@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.19.0] 2023-09-01
+
+Complete the git.Handler interface
+
 ## [1.18.0] 2023-08-30
 
 Add git Init, Fetch and Status
