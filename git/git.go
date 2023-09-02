@@ -3,7 +3,6 @@ package git
 import (
 	"bytes"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,13 +14,22 @@ import (
 // RestoreCwdFunc defines the signature of the closure to restore the working directory
 type RestoreCwdFunc func() error
 
-// Interface provides a handler to git's command line
-type Interface interface {
+// Handler provides a handler to git's command line
+type Handler interface {
 	// AddToStaging adds the given files to staging
 	AddToStaging(files []string) (err error)
 
-	// CreateTag creates an annotated tag
-	CreateTag(tag, msg string) (err error)
+	// Branch returns the active branch
+	Branch() (name string, err error)
+
+	// Branches returns the list of branches
+	Branches(all ...bool) (list []string, err error)
+
+	// CheckoutBranch checks out the given branch
+	CheckoutBranch(name string) error
+
+	// CheckoutNewBranch creates the given branch and checks it out
+	CheckoutNewBranch(name string) error
 
 	// Commit commits files in staging with the given message
 	Commit(msg string) (err error)
@@ -29,8 +37,17 @@ type Interface interface {
 	// CommitFiles adds the given files to staging and commits them with the given message
 	CommitFiles(files []string, msg string) (err error)
 
+	// Config returns the current config value
+	Config(key string) (value string, err error)
+
+	// DeleteBranch removes the given branch
+	DeleteBranch(name string, force ...bool) error
+
 	// Describe returns the corresponding tag for the given hash
 	Describe(hash string, exact ...bool) (tag string, err error)
+
+	// DropStash
+	DropStash(all ...bool) error
 
 	// Fetch brings the latest changes for the given remote
 	Fetch(remote string) (err error)
@@ -39,22 +56,59 @@ type Interface interface {
 	FileChanged(file string) bool
 
 	// Init git-initializes the root directory
-	Init() error
+	Init(initialBranch string) error
+
+	// LatestHash Returns the latest tag for the git repo related to the working directory
+	LatestHash(noFetch ...bool) (hash string, err error)
 
 	// LatestTag Returns the latest tag for the git repo related to the working directory
-	LatestTag(noFetch bool) (tag string, err error)
+	LatestTag(noFetch ...bool) (tag string, err error)
 
-	// MoveToRootDir changes working directory to git's root
-	MoveToRootDir() RestoreCwdFunc
+	// MergeStash merges remote changes, preserving ours
+	MergeStash(remote, branch, commitMsg string) error
+
+	// MustMoveToRootDir changes working directory to git's root
+	MustMoveToRootDir() RestoreCwdFunc
+
+	// NewBranch creates a new branch
+	NewBranch(name string) error
+
+	// NewTag creates an annotated tag
+	NewTag(tag, msg string) (err error)
+
+	// Pull updates tree with remote changes
+	Pull(remote, branch string) error
+
+	// Push sends branch changes to remote
+	Push(remote, branch string) error
+
+	// Remotes returns the list of remotes set for the repository
+	Remotes() (list map[string]string, err error)
 
 	// RemoveFromStaging removes the given files from the stagin area
-	RemoveFromStaging(files []string, ignoreErrors bool) (err error)
+	RemoveFromStaging(files []string, ignoreErrors ...bool) (err error)
+
+	// SetUpstreamBranchTo implements the Handler interface
+	SetUpstreamBranchTo(remote, branch string) error
+
+	// SetConfig sets a config value
+	SetConfig(key, value string) error
+
+	// SetRemote adds remote or sets URL for an existing remote
+	SetRemote(name, url string) error
+
+	// Stash stashes local changes
+	Stash(msg string, untracked ...bool) (stash string, err error)
 
 	// Status reports the current status of the working tree
 	Status() (staged, unstaged, untracked []string, err error)
+
+	// TopLevel returns the root directory
+	TopLevel(dir string) (rootDir string, err error)
 }
 
-func NewInterface(dir string) (Interface, error) {
+// NewHandler retusn a new git interface for the given directory
+func NewHandler(dir string) (Handler, error) {
 	if !HasGit() {
 		return nil, fmt.Errorf("Unable to find the git command")
 	}
@@ -65,26 +119,22 @@ func NewInterface(dir string) (Interface, error) {
 		err = nil
 	}
 
-	return &handler{root: rootDir}, nil
+	return &handlerImpl{root: rootDir}, nil
 }
 
-type handler struct {
+type handlerImpl struct {
 	root string
 }
 
-// AddToStaging adds the given files to staging
-func (h *handler) AddToStaging(files []string) (err error) {
-	for i := range files {
-		files[i], err = filepath.Abs(files[i])
-		if err != nil {
-			return
-		}
-	}
+// AddToStaging implements the Handler interface
+func (h *handlerImpl) AddToStaging(files []string) (err error) {
+	files = h.makeAbsPath(files)
 
-	restore := h.MoveToRootDir()
+	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\tStaging files...\n")
+	fmt.Printf("\nStaging files...\n")
+
 	for _, s := range files {
 		if err = executeNO("add", s); err != nil {
 			_ = h.RemoveFromStaging(files, true)
@@ -95,35 +145,94 @@ func (h *handler) AddToStaging(files []string) (err error) {
 	return
 }
 
-// CreateTag creates an annotated tag
-func (h *handler) CreateTag(tag, msg string) (err error) {
-	restore := h.MoveToRootDir()
+// Branch implements the Handler interface
+func (h *handlerImpl) Branch() (name string, err error) {
+	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\nCreating annotated tag %v with message '%v'...\n", tag, msg)
+	fmt.Printf("\nReturning active branch...\n")
 
-	return executeNO("tag", "--annotate", tag, "-m", msg)
+	out, err := execute("branch", "--show-current")
+	if err != nil {
+		return
+	}
+
+	name = strings.TrimSuffix(string(out), "\n")
+	return
 }
 
-// Commit commits files in staging with the given message
-func (h *handler) Commit(msg string) (err error) {
-	restore := h.MoveToRootDir()
+// Branches implements the Handler interface
+func (h *handlerImpl) Branches(all ...bool) (list []string, err error) {
+	restore := h.MustMoveToRootDir()
 	defer restore()
 
-	fmt.Printf("\tCommiting with '%v' as message...\n", msg)
+	fmt.Printf("\nReturning list of branches...\n")
+
+	args := []string{"branch", "--no-color"}
+	if len(all) > 0 && all[0] {
+		args = append(args, "--all")
+	}
+
+	out, err := execute(args...)
+	if err != nil {
+		return
+	}
+
+	list = strings.Split(strings.TrimSuffix(string(out), "\n"), "\n")
+	for i := range list {
+		list[i] = strings.TrimPrefix(list[i], "*")
+		list[i] = strings.TrimSpace(list[i])
+	}
+
+	return
+}
+
+// CheckoutBranch implements the Handler interface
+func (h *handlerImpl) CheckoutBranch(name string) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nChecing out %s branch...\n", name)
+
+	return executeNO("checkout", name)
+}
+
+// CheckoutNewBranch implements the Handler interface
+func (h *handlerImpl) CheckoutNewBranch(name string) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nChecking out new branch...\n")
+
+	err := h.NewBranch(name)
+	if err != nil {
+		return err
+	}
+
+	err = h.CheckoutBranch(name)
+	if err != nil {
+		h.DeleteBranch(name, false)
+		return err
+	}
+
+	return nil
+}
+
+// Commit implements the Handler interface
+func (h *handlerImpl) Commit(msg string) (err error) {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nCommiting with '%v' as message...\n", msg)
+
 	return executeNO("commit", "--message", msg)
 }
 
-// CommitFiles adds the given files to staging and commits them with the given message
-func (h *handler) CommitFiles(files []string, msg string) (err error) {
-	for i := range files {
-		files[i], err = filepath.Abs(files[i])
-		if err != nil {
-			return
-		}
-	}
+// CommitFiles implements the Handler interface
+func (h *handlerImpl) CommitFiles(files []string, msg string) (err error) {
+	files = h.makeAbsPath(files)
 
-	restore := h.MoveToRootDir()
+	restore := h.MustMoveToRootDir()
 	defer restore()
 
 	fmt.Printf("\nCommiting files...\n")
@@ -141,16 +250,66 @@ func (h *handler) CommitFiles(files []string, msg string) (err error) {
 	return
 }
 
-// Describe returns the corresponding tag for the given hash
-func (h *handler) Describe(hash string, exact ...bool) (string, error) {
-	restore := h.MoveToRootDir()
+// Config implements the Handler interface
+func (h *handlerImpl) Config(key string) (value string, err error) {
+	restore := h.MustMoveToRootDir()
 	defer restore()
+
+	fmt.Printf("\nSetting %s to %s...\n", key, value)
+
+	out, err := execute("config", key)
+	if err != nil {
+		return
+	}
+
+	value = strings.TrimSuffix(string(out), "\n")
+	return
+}
+
+// DeleteBranch implements the Handler interface
+func (h *handlerImpl) DeleteBranch(name string, force ...bool) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nDeleting %s branch...\n", name)
+
+	args := []string{"branch", "--delete"}
+	if len(force) > 0 && force[0] {
+		args = append(args, "--force")
+	}
+
+	args = append(args, name)
+
+	return executeNO(args...)
+}
+
+func (h *handlerImpl) DropStash(clear ...bool) error {
+	args := []string{"stash"}
+
+	if len(clear) > 0 && clear[0] {
+		fmt.Printf("\nClearing stash...\n")
+		args = append(args, "clear")
+	} else {
+		fmt.Printf("\nDropping from stash...\n")
+		args = append(args, "drop")
+	}
+	return executeNO(args...)
+}
+
+// Describe implements the Handler interface
+func (h *handlerImpl) Describe(hash string, exact ...bool) (string, error) {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nDescribing current tree state...\n")
 
 	args := []string{"describe"}
 	if len(exact) > 0 && exact[0] {
 		args = append(args, "--match-exact")
 	}
-	args = append(args, hash)
+	if len(hash) > 0 {
+		args = append(args, hash)
+	}
 
 	out, err := execute(args...)
 	if err != nil {
@@ -162,9 +321,9 @@ func (h *handler) Describe(hash string, exact ...bool) (string, error) {
 	return tag, nil
 }
 
-// Fetch brings the latest changes for the given remote
-func (h *handler) Fetch(remote string) (err error) {
-	fmt.Printf("\tFetching...\n")
+// Fetch implements the Handler interface
+func (h *handlerImpl) Fetch(remote string) (err error) {
+	fmt.Printf("\nFetching...\n")
 
 	if remote != "" {
 		return executeNO("fetch", remote, "--tags")
@@ -173,19 +332,15 @@ func (h *handler) Fetch(remote string) (err error) {
 	return executeNO("fetch", "--tags")
 }
 
-// FileChanged checks if a file changed and should be added to staging
-func (h *handler) FileChanged(file string) bool {
-	file, err := filepath.Abs(file)
-	if err != nil {
-		slog.With(
-			"file", file,
-			"error", err,
-		).Error("Failed to get file's absolute path")
-		return false
-	}
+// FileChanged implements the Handler interface
+func (h *handlerImpl) FileChanged(file string) bool {
+	files := h.makeAbsPath([]string{file})
+	file = files[0]
 
-	restore := h.MoveToRootDir()
+	restore := h.MustMoveToRootDir()
 	defer restore()
+
+	fmt.Printf("\nChecking if file changed...\n")
 
 	out, err := execute("diff", "--name-only", file)
 	if err != nil {
@@ -196,29 +351,68 @@ func (h *handler) FileChanged(file string) bool {
 	return len(diff) > 0
 }
 
-// Init git-initializes the root directory
-func (h *handler) Init() error {
-	restore := h.MoveToRootDir()
+// Init implements the Handler interface
+func (h *handlerImpl) Init(initialBranch string) error {
+	restore := h.MustMoveToRootDir()
 	defer restore()
+
+	fmt.Printf("\nInitializing as git repository...\n")
 
 	if _, _, _, err := h.Status(); err == nil {
 		return nil
 	}
 
+	if initialBranch != "" {
+		return executeNO("init", "--initial-branch", initialBranch)
+	}
+
 	return executeNO("init")
 }
 
-// LatestTag Returns the latest tag for the git repo related to the working directory
-func (h *handler) LatestTag(noFetch bool) (tag string, err error) {
-	restore := h.MoveToRootDir()
+// LatestHash implements the Handler interface
+func (h *handlerImpl) LatestHash(noFetch ...bool) (hash string, err error) {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nGetting latest hash...\n")
+
+	doFetch := true
+	if len(noFetch) > 0 && noFetch[0] {
+		doFetch = false
+	}
+
+	if doFetch {
+		if err = h.Fetch(""); err != nil {
+			return
+		}
+	}
+
+	out1, err := execute("rev-parse", "--verify", "HEAD")
+	if err != nil {
+		return
+	}
+
+	hash = string(out1)
+	hash = strings.TrimSuffix(hash, "\n")
+
+	return
+}
+
+// LatestTag implements the Handler interface
+func (h *handlerImpl) LatestTag(noFetch ...bool) (tag string, err error) {
+	restore := h.MustMoveToRootDir()
 	defer restore()
 
 	fmt.Printf("\nGetting latest git tag...\n")
 
-	if !noFetch {
-		fmt.Printf("\tFetching...\n")
+	doFetch := true
+	if len(noFetch) > 0 && noFetch[0] {
+		doFetch = false
+	}
+
+	if doFetch {
 		if err = h.Fetch(""); err != nil {
-			fmt.Printf("...fetching failed!\n")
+			return
 		}
 	}
 
@@ -241,8 +435,33 @@ func (h *handler) LatestTag(noFetch bool) (tag string, err error) {
 	return
 }
 
-// MoveToRootDir changes working directory to git's root
-func (h *handler) MoveToRootDir() RestoreCwdFunc {
+// MergeStash implements the Handler interface
+func (h *handlerImpl) MergeStash(remote, branch, commitMsg string) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nPerforming Stash + Pull + Merge Stash...\n")
+
+	_, err := h.Stash("", true)
+	if err != nil {
+		return err
+	}
+
+	err = h.Pull(remote, branch)
+	if err != nil {
+		return err
+	}
+
+	err = executeNO("merge", "--squash", "--strategy-option", "theirs", "stash")
+	if err != nil {
+		return err
+	}
+
+	return h.Commit(commitMsg)
+}
+
+// MustMoveToRootDir implements the Handler interface
+func (h *handlerImpl) MustMoveToRootDir() RestoreCwdFunc {
 	cwd, err := os.Getwd()
 	onerror.Fatal(err)
 	root := cwd
@@ -257,21 +476,91 @@ func (h *handler) MoveToRootDir() RestoreCwdFunc {
 	return func() error { return os.Chdir(cwd) }
 }
 
-// RemoveFromStaging removes the given files from the stagin area
-func (h *handler) RemoveFromStaging(files []string, ignoreErrors bool) (err error) {
-	for i := range files {
-		files[i], err = filepath.Abs(files[i])
+// NewBranch implements the Handler interface
+func (h *handlerImpl) NewBranch(name string) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nCreating branch...\n")
+
+	return executeNO("branch", name)
+}
+
+// NewTag implements the Handler interface
+func (h *handlerImpl) NewTag(tag, msg string) (err error) {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nCreating annotated tag %v with message '%v'...\n", tag, msg)
+
+	return executeNO("tag", "--annotate", tag, "-m", msg)
+}
+
+// Pull implements the Handler interface
+func (h *handlerImpl) Pull(remote, branch string) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nPulling %s changes from %s...\n", branch, remote)
+
+	return executeNO("pull", remote, branch)
+}
+
+// Push implements the Handler interface
+func (h *handlerImpl) Push(remote, branch string) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nPushing %s changes to %s...\n", branch, remote)
+
+	return executeNO("push", remote, branch)
+}
+
+// Remotes implements the Handler interface
+func (h *handlerImpl) Remotes() (list map[string]string, err error) {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nGetting list of remotes...\n")
+
+	out, err := execute("remote")
+	if err != nil {
+		return
+	}
+
+	keys := strings.Split(string(out), "\n")
+
+	list = make(map[string]string)
+	for _, k := range keys {
+		if k == "" {
+			continue
+		}
+
+		out, err = execute("remote", "get-url", k)
 		if err != nil {
 			return
 		}
+		list[k] = string(out)
 	}
 
-	restore := h.MoveToRootDir()
+	return
+}
+
+// RemoveFromStaging implements the Handler interface
+func (h *handlerImpl) RemoveFromStaging(files []string, ignoreErrors ...bool) (err error) {
+	files = h.makeAbsPath(files)
+
+	restore := h.MustMoveToRootDir()
 	defer restore()
+
+	ackErrors := true
+	if len(ignoreErrors) > 0 && ignoreErrors[0] {
+		ackErrors = false
+	}
 
 	for _, s := range files {
 		if err = executeNO("reset", s); err != nil {
-			if !ignoreErrors {
+			if ackErrors {
 				return
 			}
 		}
@@ -279,8 +568,88 @@ func (h *handler) RemoveFromStaging(files []string, ignoreErrors bool) (err erro
 	return
 }
 
-// Status reports the current status of the working tree
-func (h *handler) Status() (staged, unstaged, untracked []string, err error) {
+// SetConfig implements the Handler interface
+func (h *handlerImpl) SetConfig(key string, value string) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nSetting %s to %s...\n", key, value)
+
+	return executeNO("config", key, value)
+}
+
+// SetRemote implements the Handler interface
+func (h *handlerImpl) SetRemote(name string, url string) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nSetting remote...\n")
+
+	list, err := h.Remotes()
+	if err != nil {
+		return err
+	}
+
+	_, ok := list[name]
+
+	if ok {
+		return executeNO("remote", "set-url", name, url)
+	}
+
+	return executeNO("remote", "add", name, url)
+}
+
+// SetUpstreamBranchTo implements the Handler interface
+func (h *handlerImpl) SetUpstreamBranchTo(remote, branch string) error {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nSetting %s branch's remote to %s...\n", branch, remote)
+
+	return executeNO("branch", "--set-upstream-to", remote+"/"+branch)
+}
+
+// Stash implements the handler interface
+func (h *handlerImpl) Stash(msg string, untracked ...bool) (stash string, err error) {
+	restore := h.MustMoveToRootDir()
+	defer restore()
+
+	fmt.Printf("\nStashing changes...\n")
+
+	args := []string{"stash"}
+
+	if msg != "" {
+		args = append(args, "--message", msg)
+	}
+
+	if len(untracked) > 0 && untracked[0] {
+		args = append(args, "--include-untracked")
+	}
+
+	err = executeNO(args...)
+
+	out, err := execute("stash", "list")
+	if err != nil {
+		return
+	}
+
+	list := strings.Split(strings.TrimSuffix(string(out), "\n"), "\n")
+	if len(list) == 0 {
+		return
+	}
+
+	parts := strings.Split(list[0], ":")
+	if len(parts) == 0 {
+		return
+	}
+
+	stash = parts[0]
+
+	return
+}
+
+// Status implements the Handler interface
+func (h *handlerImpl) Status() (staged, unstaged, untracked []string, err error) {
 	out, err := execute("status", "--short", "--porcelain")
 	if err != nil {
 		return
@@ -317,12 +686,31 @@ func (h *handler) Status() (staged, unstaged, untracked []string, err error) {
 	return
 }
 
-func (h *handler) TopLevel(dir string) (rootDir string, err error) {
+// TopLevel implements the Handler interface
+func (h *handlerImpl) TopLevel(dir string) (rootDir string, err error) {
 	rootDir, err = getRootDir(dir)
 	if err != nil {
 		rootDir = ""
 	}
 	return
+}
+
+func (h *handlerImpl) makeAbsPath(files []string) []string {
+	pwd, err := os.Getwd()
+	if err != nil || (pwd != h.root && !strings.Contains(pwd, h.root)) {
+		return files
+	}
+
+	var newFiles []string
+	for i := range files {
+		f, err := filepath.Abs(files[i])
+		if err != nil {
+			return files
+		}
+		newFiles = append(newFiles, f)
+	}
+
+	return newFiles
 }
 
 // HasGit checks if the git command exists in PATH
@@ -358,7 +746,8 @@ func getRootDir(dir string) (rootDir string, err error) {
 }
 
 func executeNO(args ...string) error {
-	_, err := exec.Command("git", args...).CombinedOutput()
+	cmd := exec.Command("git", args...)
+	_, err := cmd.CombinedOutput()
 	return err
 }
 
