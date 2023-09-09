@@ -358,12 +358,18 @@ func TestMoveToRootDir(t *testing.T) {
 	err = os.Chdir(subdir)
 	assert.NoError(t, err)
 
-	tl, err := g.TopLevel(subdir)
+	restore := g.MustMoveToRootDir()
+
+	tl, err := os.Getwd()
 	assert.NoError(t, err)
 
 	assert.Equal(t, dir, tl)
 
-	_ = g.MustMoveToRootDir()
+	err = restore()
+	assert.NoError(t, err)
+
+	actual, err := os.Getwd()
+	assert.Equal(t, subdir, actual)
 }
 
 func TestPull(t *testing.T) {
