@@ -36,9 +36,6 @@ type entry struct {
 // Fatal asserts that no error was given
 func (e *entry) Fatal(err error) {
 	if err != nil {
-		if e.pc == 0 {
-			e.pc = callerPC()
-		}
 		e.logError(slog.LevelError, err)
 		os.Exit(1)
 	}
@@ -67,10 +64,6 @@ func (e *entry) LogHTTP(err error, r *http.Response, doNotCloseBody bool) error 
 		return nil
 	}
 
-	if e.pc == 0 {
-		e.pc = callerPC()
-	}
-
 	if r != nil {
 		a := statusAttrs(r.StatusCode, r.Status)
 		e.Logger = e.Logger.With(a...)
@@ -84,9 +77,6 @@ func (e *entry) LogHTTP(err error, r *http.Response, doNotCloseBody bool) error 
 // Log logs an error
 func (e *entry) Log(err error) {
 	if err != nil {
-		if e.pc == 0 {
-			e.pc = callerPC()
-		}
 		e.logError(slog.LevelError, err)
 	}
 }
@@ -94,9 +84,6 @@ func (e *entry) Log(err error) {
 // Panic asserts that no error was given
 func (e *entry) Panic(err error) {
 	if err != nil {
-		if e.pc == 0 {
-			e.pc = callerPC()
-		}
 		e.logError(slog.LevelError, err)
 		panic(err)
 	}
@@ -105,9 +92,6 @@ func (e *entry) Panic(err error) {
 // Warn warns on error
 func (e *entry) Warn(err error) {
 	if err != nil {
-		if e.pc == 0 {
-			e.pc = callerPC()
-		}
 		e.logError(slog.LevelWarn, err)
 	}
 }
@@ -121,12 +105,21 @@ func (e *entry) With(a ...any) Recorder {
 }
 
 func (e *entry) logError(level slog.Level, err error) {
-	record := slog.NewRecord(time.Now(), level, "ONERROR-"+err.Error(), e.pc)
+	handler := e.Logger.Handler()
+	if !handler.Enabled(context.Background(), level) {
+		return
+	}
+
+	if e.pc == 0 {
+		e.pc = callerPC(3)
+	}
+
+	record := slog.NewRecord(time.Now(), level, err.Error(), e.pc)
 	e.Logger.Handler().Handle(context.Background(), record)
 }
 
-func callerPC() uintptr {
-	pc, _, _, _ := runtime.Caller(2)
+func callerPC(skip int) uintptr {
+	pc, _, _, _ := runtime.Caller(skip)
 	return pc
 }
 
