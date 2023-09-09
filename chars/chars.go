@@ -1,4 +1,4 @@
-package ing2
+package chars
 
 import (
 	"crypto/rand"

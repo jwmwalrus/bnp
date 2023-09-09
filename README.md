@@ -3,6 +3,10 @@ Bits 'N Pieces
 
 Common utilities.
 
+## chars
+
+String utilities.
+
 ## cron
 
 Cron job installer.
@@ -18,10 +22,6 @@ A Git abstraction.
 ## httpstatus
 
 HTTP status checkers.
-
-## ing2
-
-String utilities.
 
 ## isformat
 
