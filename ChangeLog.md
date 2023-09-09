@@ -9,6 +9,17 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.20.0] 2023-09-09
+
+Misc. changes
+
+### Modified
+
+* Renamed the `ing2` package to `chars`
+* Added check for level to onerror
+* Misc. git-related adjustments
+* Added Taskfile
+
 ## [1.19.1] 2023-09-02
 
 Use slo for git instead of stdout
@@ -22,7 +33,7 @@ Complete the git.Handler interface
 Add git Init, Fetch and Status
 
 ## [1.17.0] 2023-08-30
-
+R
 Rework the git interface
 
 ## [1.16.2] 2023-08-29
