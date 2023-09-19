@@ -108,6 +108,9 @@ type Handler interface {
 
 	// TopLevel returns the root directory
 	TopLevel() string
+
+	// Unstage removes the given files from staging
+	Unstage(files []string) error
 }
 
 type LogEntry struct {

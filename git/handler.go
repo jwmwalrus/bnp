@@ -409,7 +409,25 @@ func (h *handlerImpl) NewTag(tag, msg string) (err error) {
 
 // PopStash pops the most recent stash
 func (h *handlerImpl) PopStash(msg string) error {
-	panic("not implemented") // TODO: Implement
+	h.log.Info("Popping from stash", "stash-msg", msg)
+
+	args := []string{"stash", "pop"}
+
+	if msg != "" {
+		list, err := h.StashList()
+		if err != nil {
+			return err
+		}
+
+		for _, l := range list {
+			if l.Description == msg {
+				args = append(args, l.Name)
+				break
+			}
+		}
+	}
+
+	return h.executeNO(args...)
 }
 
 // Pull implements the Handler interface
@@ -640,6 +658,15 @@ func (h *handlerImpl) TopLevel() string {
 	h.log.Info("Returning top level")
 
 	return h.root
+}
+
+func (h *handlerImpl) Unstage(files []string) error {
+	h.log.Info("Removing files from staging", "files", files)
+
+	args := []string{"reset"}
+	args = append(args, files...)
+
+	return h.executeNO(args...)
 }
 
 func (h *handlerImpl) abortMerge() error {
