@@ -9,6 +9,16 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.20.1] 2023-09-19
+
+Git interface issues
+
+## Fixed
+* `PopStash` implementation
+
+## Added
+* `Unstage`
+
 ## [1.20.0] 2023-09-09
 
 Misc. changes
@@ -33,7 +43,7 @@ Complete the git.Handler interface
 Add git Init, Fetch and Status
 
 ## [1.17.0] 2023-08-30
-R
+
 Rework the git interface
 
 ## [1.16.2] 2023-08-29
