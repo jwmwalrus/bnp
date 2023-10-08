@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.21.0] 2023-10-07
+
+Add DiffUpstream and RemoteUpdate to git
+
 ## [1.20.1] 2023-09-19
 
 Git interface issues
