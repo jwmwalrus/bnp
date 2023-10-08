@@ -40,6 +40,9 @@ type Handler interface {
 	// Describe returns the corresponding tag for the given hash
 	Describe(hash string, exact ...bool) (tag string, err error)
 
+	// DiffUpstream compares current branch to the given upstream one
+	DiffUpstream(remote, branch string) (differs bool, diff string, err error)
+
 	// DropStash
 	DropStash(all ...bool) error
 
@@ -84,6 +87,9 @@ type Handler interface {
 
 	// Remotes returns the list of remotes set for the repository
 	Remotes() (list map[string]string, err error)
+
+	// RemoteUpdate updates all remote references
+	RemoteUpdate() error
 
 	// RemoveFromStaging removes the given files from the stagin area
 	RemoveFromStaging(files []string, ignoreErrors ...bool) (err error)

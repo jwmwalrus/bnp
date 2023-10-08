@@ -29,12 +29,12 @@ func NewHandler(dir string) (Handler, error) {
 	return &handlerImpl{root: rootDir, log: slog.Default().WithGroup("git")}, nil
 }
 
+// handlerImp implements the Handler interface.
 type handlerImpl struct {
 	root string
 	log  *slog.Logger
 }
 
-// AddToStaging implements the Handler interface
 func (h *handlerImpl) AddToStaging(files []string) (err error) {
 	files = h.makeAbsPath(files)
 
@@ -50,7 +50,6 @@ func (h *handlerImpl) AddToStaging(files []string) (err error) {
 	return
 }
 
-// Branch implements the Handler interface
 func (h *handlerImpl) Branch() (name string, err error) {
 	h.log.Info("Returning active branch")
 
@@ -63,7 +62,6 @@ func (h *handlerImpl) Branch() (name string, err error) {
 	return
 }
 
-// Branches implements the Handler interface
 func (h *handlerImpl) Branches(all ...bool) (list []string, err error) {
 	h.log.Info("Returning list of branches", "all", all)
 
@@ -86,14 +84,12 @@ func (h *handlerImpl) Branches(all ...bool) (list []string, err error) {
 	return
 }
 
-// CheckoutBranch implements the Handler interface
 func (h *handlerImpl) CheckoutBranch(name string) error {
 	h.log.Info("Checing out branch", "name", name)
 
 	return h.executeNO("checkout", name)
 }
 
-// CheckoutNewBranch implements the Handler interface
 func (h *handlerImpl) CheckoutNewBranch(name string) error {
 	h.log.Info("Checking out new branch", "name", name)
 
@@ -111,14 +107,12 @@ func (h *handlerImpl) CheckoutNewBranch(name string) error {
 	return nil
 }
 
-// Commit implements the Handler interface
 func (h *handlerImpl) Commit(msg string) (err error) {
 	h.log.Info("Commiting", "msg", msg)
 
 	return h.executeNO("commit", "--message", msg)
 }
 
-// CommitFiles implements the Handler interface
 func (h *handlerImpl) CommitFiles(files []string, msg string) (err error) {
 	files = h.makeAbsPath(files)
 
@@ -140,7 +134,6 @@ func (h *handlerImpl) CommitFiles(files []string, msg string) (err error) {
 	return
 }
 
-// Config implements the Handler interface
 func (h *handlerImpl) Config(key string) (value string, err error) {
 	h.log.Info("Getting config value", "key", key)
 
@@ -153,7 +146,6 @@ func (h *handlerImpl) Config(key string) (value string, err error) {
 	return
 }
 
-// DeleteBranch implements the Handler interface
 func (h *handlerImpl) DeleteBranch(name string, force ...bool) error {
 	h.log.With(
 		"name", name,
@@ -170,6 +162,24 @@ func (h *handlerImpl) DeleteBranch(name string, force ...bool) error {
 	return h.executeNO(args...)
 }
 
+func (h *handlerImpl) DiffUpstream(remote string, branch string) (bool, string, error) {
+	h.log.With(
+		"remote", remote,
+		"branch", branch,
+	).Info("Checking if current branch differs from upstream's")
+
+	args := []string{"diff", remote + "/" + branch}
+
+	bv, err := h.execute(args...)
+	if err != nil {
+		return false, "", err
+	}
+
+	str := strings.TrimSuffix(string(bv), "\n")
+
+	return len(str) > 0, str, nil
+}
+
 func (h *handlerImpl) DropStash(clear ...bool) error {
 	args := []string{"stash"}
 
@@ -183,7 +193,6 @@ func (h *handlerImpl) DropStash(clear ...bool) error {
 	return h.executeNO(args...)
 }
 
-// Describe implements the Handler interface
 func (h *handlerImpl) Describe(hash string, exact ...bool) (string, error) {
 	h.log.With(
 		"hash", hash,
@@ -207,7 +216,6 @@ func (h *handlerImpl) Describe(hash string, exact ...bool) (string, error) {
 	return tag, nil
 }
 
-// Fetch implements the Handler interface
 func (h *handlerImpl) Fetch(remote string) (err error) {
 	h.log.Info("Fetching", "remote", remote)
 
@@ -218,7 +226,6 @@ func (h *handlerImpl) Fetch(remote string) (err error) {
 	return h.executeNO("fetch", "--tags")
 }
 
-// FileChanged implements the Handler interface
 func (h *handlerImpl) FileChanged(file string) bool {
 	files := h.makeAbsPath([]string{file})
 	file = files[0]
@@ -233,7 +240,6 @@ func (h *handlerImpl) FileChanged(file string) bool {
 	return len(diff) > 0
 }
 
-// Init implements the Handler interface
 func (h *handlerImpl) Init(initialBranch string) error {
 	h.log.Info("Initializing git repository", "initial-branch", initialBranch)
 
@@ -244,7 +250,6 @@ func (h *handlerImpl) Init(initialBranch string) error {
 	return h.executeNO("init")
 }
 
-// LatestHash implements the Handler interface
 func (h *handlerImpl) LatestHash(noFetch ...bool) (hash string, err error) {
 	h.log.Info("Getting latest hash", "no-fetch", noFetch)
 
@@ -269,7 +274,6 @@ func (h *handlerImpl) LatestHash(noFetch ...bool) (hash string, err error) {
 	return
 }
 
-// LatestTag implements the Handler interface
 func (h *handlerImpl) LatestTag(noFetch ...bool) (tag string, err error) {
 	h.log.Info("Getting latest tag", "no-fetch", noFetch)
 
@@ -300,7 +304,6 @@ func (h *handlerImpl) LatestTag(noFetch ...bool) (tag string, err error) {
 	return
 }
 
-// Log implements the Handler interface
 func (h *handlerImpl) Log(maxCount int) ([]LogEntry, error) {
 	args := []string{"log", "--pretty=%H;;%at;;%an;;%ae;;%s;;%b"}
 
@@ -344,7 +347,6 @@ func (h *handlerImpl) Log(maxCount int) ([]LogEntry, error) {
 	return list, nil
 }
 
-// MergeStash implements the Handler interface
 func (h *handlerImpl) MergeStash(remote, branch, commitMsg string) error {
 	h.log.With(
 		"remote", remote,
@@ -374,7 +376,6 @@ func (h *handlerImpl) MergeStash(remote, branch, commitMsg string) error {
 	return h.Commit(commitMsg)
 }
 
-// MustMoveToRootDir implements the Handler interface
 func (h *handlerImpl) MustMoveToRootDir() RestoreCwdFunc {
 	cwd, err := os.Getwd()
 	onerror.Fatal(err)
@@ -390,14 +391,12 @@ func (h *handlerImpl) MustMoveToRootDir() RestoreCwdFunc {
 	return func() error { return os.Chdir(cwd) }
 }
 
-// NewBranch implements the Handler interface
 func (h *handlerImpl) NewBranch(name string) error {
 	h.log.Info("Creating branch", "name", name)
 
 	return h.executeNO("branch", name)
 }
 
-// NewTag implements the Handler interface
 func (h *handlerImpl) NewTag(tag, msg string) (err error) {
 	h.log.With(
 		"tag", tag,
@@ -407,7 +406,6 @@ func (h *handlerImpl) NewTag(tag, msg string) (err error) {
 	return h.executeNO("tag", "--annotate", tag, "-m", msg)
 }
 
-// PopStash pops the most recent stash
 func (h *handlerImpl) PopStash(msg string) error {
 	h.log.Info("Popping from stash", "stash-msg", msg)
 
@@ -430,7 +428,6 @@ func (h *handlerImpl) PopStash(msg string) error {
 	return h.executeNO(args...)
 }
 
-// Pull implements the Handler interface
 func (h *handlerImpl) Pull(remote, branch string, noCommit ...bool) error {
 	h.log.With(
 		"remote", remote,
@@ -447,7 +444,6 @@ func (h *handlerImpl) Pull(remote, branch string, noCommit ...bool) error {
 	return h.executeNO(args...)
 }
 
-// Push implements the Handler interface
 func (h *handlerImpl) Push(remote, branch string) error {
 	h.log.With(
 		"remote", remote,
@@ -457,7 +453,6 @@ func (h *handlerImpl) Push(remote, branch string) error {
 	return h.executeNO("push", remote, branch)
 }
 
-// Remotes implements the Handler interface
 func (h *handlerImpl) Remotes() (list map[string]string, err error) {
 	h.log.Info("Getting list of remotes")
 
@@ -484,7 +479,12 @@ func (h *handlerImpl) Remotes() (list map[string]string, err error) {
 	return
 }
 
-// RemoveFromStaging implements the Handler interface
+func (h *handlerImpl) RemoteUpdate() error {
+	h.log.Info("Uodating remote references")
+
+	return h.executeNO("remote", "update")
+}
+
 func (h *handlerImpl) RemoveFromStaging(files []string, ignoreErrors ...bool) (err error) {
 	files = h.makeAbsPath(files)
 
@@ -508,7 +508,6 @@ func (h *handlerImpl) RemoveFromStaging(files []string, ignoreErrors ...bool) (e
 	return
 }
 
-// SetConfig implements the Handler interface
 func (h *handlerImpl) SetConfig(key string, value string) error {
 	h.log.With(
 		"key", key,
@@ -518,7 +517,6 @@ func (h *handlerImpl) SetConfig(key string, value string) error {
 	return h.executeNO("config", key, value)
 }
 
-// SetRemote implements the Handler interface
 func (h *handlerImpl) SetRemote(name string, url string) error {
 	h.log.With(
 		"name", name,
@@ -539,7 +537,6 @@ func (h *handlerImpl) SetRemote(name string, url string) error {
 	return h.executeNO("remote", "add", name, url)
 }
 
-// SetUpstreamBranchTo implements the Handler interface
 func (h *handlerImpl) SetUpstreamBranchTo(remote, branch string) error {
 	h.log.With(
 		"remote", remote,
@@ -549,7 +546,6 @@ func (h *handlerImpl) SetUpstreamBranchTo(remote, branch string) error {
 	return h.executeNO("branch", "--set-upstream-to", remote+"/"+branch)
 }
 
-// Stash implements the handler interface
 func (h *handlerImpl) Stash(msg string, untracked ...bool) (entry StashEntry, err error) {
 	h.log.With(
 		"msg", msg,
@@ -613,7 +609,6 @@ func (h *handlerImpl) StashList() ([]StashEntry, error) {
 	return list, nil
 }
 
-// Status implements the Handler interface
 func (h *handlerImpl) Status() (staged, unstaged, untracked []string, err error) {
 	h.log.Info("Getting status")
 
@@ -653,7 +648,6 @@ func (h *handlerImpl) Status() (staged, unstaged, untracked []string, err error)
 	return
 }
 
-// TopLevel implements the Handler interface
 func (h *handlerImpl) TopLevel() string {
 	h.log.Info("Returning top level")
 
