@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.22.0] 2024-01-10
+
+Add more Pause-related functions
+
 ## [1.21.0] 2023-10-07
 
 Add DiffUpstream and RemoteUpdate to git
