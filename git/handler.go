@@ -14,7 +14,7 @@ import (
 	"github.com/jwmwalrus/bnp/onerror"
 )
 
-// NewHandler retusn a new git interface for the given directory
+// NewHandler retusn a new git interface for the given directory.
 func NewHandler(dir string) (Handler, error) {
 	if !HasGit() {
 		return nil, fmt.Errorf("Unable to find the git command")
@@ -108,7 +108,7 @@ func (h *handlerImpl) CheckoutNewBranch(name string) error {
 }
 
 func (h *handlerImpl) Commit(msg string) (err error) {
-	h.log.Info("Commiting", "msg", msg)
+	h.log.Info("Committing", "msg", msg)
 
 	return h.executeNO("commit", "--message", msg)
 }
@@ -119,7 +119,7 @@ func (h *handlerImpl) CommitFiles(files []string, msg string) (err error) {
 	h.log.With(
 		"files", files,
 		"msg", msg,
-	).Info("Commiting with files")
+	).Info("Committing with files")
 
 	if err = h.AddToStaging(files); err != nil {
 		_ = h.RemoveFromStaging(files, true)

@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-// RestoreCwdFunc defines the signature of the closure to restore the working directory
+// RestoreCwdFunc defines the signature of the closure to restore the working directory.
 type RestoreCwdFunc func() error
 
-// Handler provides a handler to git's command line
+// Handler provides a handler to git's command line.
 type Handler interface {
 	// AddToStaging adds the given files to staging
 	AddToStaging(files []string) (err error)
@@ -134,7 +134,7 @@ type StashEntry struct {
 	Description string `json:"description"`
 }
 
-// HasGit checks if the git command exists in PATH
+// HasGit checks if the git command exists in PATH.
 func HasGit() bool {
 	s, err := exec.LookPath("git")
 	return s != "" && err == nil
