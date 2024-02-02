@@ -670,14 +670,7 @@ func (h *handlerImpl) abortMerge() error {
 }
 
 func (h *handlerImpl) executeNO(in ...string) error {
-	args := []string{"-C", h.root}
-	args = append(args, in...)
-
-	cmd := exec.Command("git", args...)
-
-	slog.Debug("Running git command with combined output", "cmd", cmd)
-
-	_, err := cmd.CombinedOutput()
+	_, err := h.execute(in...)
 	return err
 }
 
@@ -686,13 +679,19 @@ func (h *handlerImpl) execute(in ...string) ([]byte, error) {
 	args = append(args, in...)
 
 	cmd := exec.Command("git", args...)
-	out := &bytes.Buffer{}
-	cmd.Stdout = out
+	outb := &bytes.Buffer{}
+	errb := &bytes.Buffer{}
+	cmd.Stdout = outb
+	cmd.Stderr = errb
 
 	slog.Debug("Running git command", "cmd", cmd)
 
 	err := cmd.Run()
-	return out.Bytes(), err
+	if err != nil {
+		err = fmt.Errorf("%s: %w", errb.String(), err)
+	}
+
+	return outb.Bytes(), err
 }
 
 func (h *handlerImpl) makeAbsPath(files []string) []string {
