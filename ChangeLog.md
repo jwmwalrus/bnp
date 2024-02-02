@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.22.1] 2024-02-01
+
+Return git's stderr contents along with errors
+
 ## [1.22.0] 2024-01-10
 
 Add more Pause-related functions
