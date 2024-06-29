@@ -10,7 +10,7 @@ import (
 
 var randomSeed atomic.Pointer[mrand.Rand]
 
-// GetRandomString returns a random string of the given length
+// GetRandomString returns a random string of the given length.
 func GetRandomString(n int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -21,7 +21,7 @@ func GetRandomString(n int) string {
 	return string(b)
 }
 
-// GetRandomLetters returns a random string of letters of the given length
+// GetRandomLetters returns a random string of letters of the given length.
 func GetRandomLetters(n int) (string, error) {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -36,13 +36,16 @@ func GetRandomLetters(n int) (string, error) {
 	return string(b), nil
 }
 
-// TruncateText returns the truncated version of the given string,
-// ellipsis added
-func TruncateText(s string, max int) string {
-	if max > len(s) {
+// Truncate returns the truncated version of the given string,
+// ellipsis added.
+func Truncate(s string, n int, noEllipsis ...bool) string {
+	if len(s) <= n {
 		return s
 	}
-	return s[:max] + "..."
+	if len(noEllipsis) > 0 && noEllipsis[0] {
+		return s[:n]
+	}
+	return s[:max(0, n-3)] + "..."
 }
 
 func init() {
