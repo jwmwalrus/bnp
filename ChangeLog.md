@@ -9,6 +9,16 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.23.0] 2024-06-29
+
+Modify chars.TruncateText
+
+### Added
+* chars.Truncate, with optional ellipsis
+
+### Removed
+* chars.TruncateText
+
 ## [1.22.1] 2024-02-01
 
 Return git's stderr contents along with errors
