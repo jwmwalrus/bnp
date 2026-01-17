@@ -9,6 +9,10 @@ This project uses [semantic versions](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.24.0] 2026-01-17
+
+Adjust random chars functions
+
 ## [1.23.1] 2025-04-06
 
 Update Go version
