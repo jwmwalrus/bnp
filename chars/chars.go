@@ -11,20 +11,20 @@ import (
 var randomSeed atomic.Pointer[mrand.Rand]
 
 // GetRandomString returns a random string of the given length.
-func GetRandomString(n int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+func GetRandomString(n int) (string, error) {
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = charset[randomSeed.Load().Intn(len(charset))]
-	}
-	return string(b)
+	return randomFromCharset(charset, n)
 }
 
 // GetRandomLetters returns a random string of letters of the given length.
 func GetRandomLetters(n int) (string, error) {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
+	return randomFromCharset(charset, n)
+}
+
+func randomFromCharset(charset string, n int) (string, error) {
 	b := make([]byte, n)
 	for i := range b {
 		x, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
